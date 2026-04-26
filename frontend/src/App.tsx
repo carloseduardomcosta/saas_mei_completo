@@ -6,6 +6,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Dashboard } from "./pages/Dashboard";
 import AgendaPage from "./pages/AgendaPage";
+import FinanceiroPage from "./pages/FinanceiroPage";
 import Agendar from "./pages/public/Agendar";
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
           >
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/agenda" element={<AgendaPage />} />
+            <Route path="/financeiro" element={<FinanceiroPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
