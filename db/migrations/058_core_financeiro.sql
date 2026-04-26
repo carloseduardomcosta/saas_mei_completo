@@ -8,7 +8,7 @@ CREATE SCHEMA IF NOT EXISTS financeiro;
 -- ------------------------------------------------------------
 -- Configuração por MEI (override do limite global)
 -- ------------------------------------------------------------
-CREATE TABLE financeiro.config (
+CREATE TABLE IF NOT EXISTS financeiro.config (
   mei_id             UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
   limite_anual_cents INTEGER NOT NULL DEFAULT 8100000, -- R$ 81.000,00
   tipo_atividade     TEXT    NOT NULL DEFAULT 'comercio'
@@ -17,7 +17,7 @@ CREATE TABLE financeiro.config (
 );
 
 -- Limite global default (sobrescreve env var; admin pode ajustar)
-CREATE TABLE financeiro.parametros_globais (
+CREATE TABLE IF NOT EXISTS financeiro.parametros_globais (
   chave      TEXT PRIMARY KEY,
   valor      TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -29,7 +29,7 @@ ON CONFLICT DO NOTHING;
 -- ------------------------------------------------------------
 -- Lançamentos de receitas e despesas
 -- ------------------------------------------------------------
-CREATE TABLE financeiro.lancamentos (
+CREATE TABLE IF NOT EXISTS financeiro.lancamentos (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   mei_id            UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   data              DATE        NOT NULL,
@@ -48,22 +48,22 @@ CREATE TABLE financeiro.lancamentos (
 );
 
 -- Índices para queries de soma por ano/mês por tenant
-CREATE INDEX idx_lanc_mei_ano
+CREATE INDEX IF NOT EXISTS idx_lanc_mei_ano
   ON financeiro.lancamentos (mei_id, EXTRACT(YEAR FROM data))
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_lanc_mei_mes
+CREATE INDEX IF NOT EXISTS idx_lanc_mei_mes
   ON financeiro.lancamentos (mei_id, EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data))
   WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_lanc_mei_tipo_status
+CREATE INDEX IF NOT EXISTS idx_lanc_mei_tipo_status
   ON financeiro.lancamentos (mei_id, tipo, status)
   WHERE deleted_at IS NULL;
 
 -- ------------------------------------------------------------
 -- Pagamentos do DAS
 -- ------------------------------------------------------------
-CREATE TABLE financeiro.das_pagamentos (
+CREATE TABLE IF NOT EXISTS financeiro.das_pagamentos (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   mei_id            UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   competencia_mes   SMALLINT    NOT NULL CHECK (competencia_mes BETWEEN 1 AND 12),
@@ -78,17 +78,17 @@ CREATE TABLE financeiro.das_pagamentos (
   UNIQUE (mei_id, competencia_mes, competencia_ano)
 );
 
-CREATE INDEX idx_das_mei_ano
+CREATE INDEX IF NOT EXISTS idx_das_mei_ano
   ON financeiro.das_pagamentos (mei_id, competencia_ano);
 
-CREATE INDEX idx_das_nao_pagos
+CREATE INDEX IF NOT EXISTS idx_das_nao_pagos
   ON financeiro.das_pagamentos (mei_id, competencia_mes, competencia_ano)
   WHERE data_pagamento IS NULL;
 
 -- ------------------------------------------------------------
 -- Controle de alertas enviados (idempotência)
 -- ------------------------------------------------------------
-CREATE TABLE financeiro.alertas_enviados (
+CREATE TABLE IF NOT EXISTS financeiro.alertas_enviados (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   mei_id      UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   tipo_alerta TEXT        NOT NULL,
@@ -98,5 +98,5 @@ CREATE TABLE financeiro.alertas_enviados (
   UNIQUE (mei_id, tipo_alerta, periodo_ref)
 );
 
-CREATE INDEX idx_alertas_mei
+CREATE INDEX IF NOT EXISTS idx_alertas_mei
   ON financeiro.alertas_enviados (mei_id, tipo_alerta);
