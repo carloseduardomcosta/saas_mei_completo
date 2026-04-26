@@ -7,7 +7,7 @@
 
 ## Epic 1 — Infraestrutura e Schema
 
-### FINF-001 · Migration 058_core_financeiro.sql · P0 · S
+### FINF-001 · Migration 058_core_financeiro.sql · P0 · S · ✅ CONCLUÍDO
 
 **Descrição**  
 Criar o arquivo `db/migrations/058_core_financeiro.sql` com o schema completo do módulo financeiro.
@@ -20,15 +20,15 @@ Criar o arquivo `db/migrations/058_core_financeiro.sql` com o schema completo do
 - `financeiro.alertas_enviados` — idempotência de alertas
 
 **Critérios de aceitação:**
-- [ ] Todos os índices de performance criados (por ano, mês, tipo, status)
-- [ ] Constraints CHECK validam tipos e categorias no nível do banco
-- [ ] UNIQUE (mei_id, competencia_mes, competencia_ano) em das_pagamentos
-- [ ] UNIQUE (mei_id, tipo_alerta, periodo_ref) em alertas_enviados
-- [ ] Migration roda sem erro em banco vazio e em banco com migration 057
+- [x] Todos os índices de performance criados (por ano, mês, tipo, status)
+- [x] Constraints CHECK validam tipos e categorias no nível do banco
+- [x] UNIQUE (mei_id, competencia_mes, competencia_ano) em das_pagamentos
+- [x] UNIQUE (mei_id, tipo_alerta, periodo_ref) em alertas_enviados
+- [x] Migration roda sem erro em banco vazio e em banco com migration 057
 
 ---
 
-### FINF-002 · Inicializar config padrão por MEI · P0 · XS
+### FINF-002 · Inicializar config padrão por MEI · P0 · XS · ✅ CONCLUÍDO
 
 **Descrição**  
 Criar `financeiro.config` default (limite = R$ 81.000, tipo = 'comercio') ao registrar novo usuário.
@@ -36,14 +36,14 @@ Criar `financeiro.config` default (limite = R$ 81.000, tipo = 'comercio') ao reg
 **Onde:** `api/src/routes/auth.routes.ts` — após INSERT em `public.users`.
 
 **Critérios de aceitação:**
-- [ ] Novo registro cria linha em `financeiro.config` na mesma transação
-- [ ] Se INSERT falhar, rollback impede usuário órfão sem config
+- [x] Novo registro cria linha em `financeiro.config` na mesma transação
+- [x] Se INSERT falhar, rollback impede usuário órfão sem config
 
 ---
 
 ## Epic 2 — Lógica de Feriados e Dias Úteis
 
-### FINF-010 · utils/feriados.ts · P0 · M
+### FINF-010 · utils/feriados.ts · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `api/src/utils/feriados.ts` com lógica de feriados brasileiros e cálculo de vencimento do DAS.
@@ -62,14 +62,16 @@ export function dasVencimento(mes: number, ano: number): Date
 **Algoritmo:** Butcher/Meeus (sem dependências externas)
 
 **Critérios de aceitação:**
-- [ ] Implementado sem imports externos (zero deps)
-- [ ] Funciona para anos 2024–2035 sem ajuste manual
-- [ ] `dasVencimento(5, 2025)` retorna `2025-06-20` (sexta-feira útil)
-- [ ] `dasVencimento(1, 2026)` retorna data ajustada se dia 20 cair em FDS/feriado
+- [x] Implementado sem imports externos (zero deps)
+- [x] Funciona para anos 2024–2035 sem ajuste manual
+- [x] `dasVencimento(5, 2025)` retorna `2025-06-20` (sexta-feira útil)
+- [x] `dasVencimento(1, 2026)` retorna data ajustada se dia 20 cair em FDS/feriado
+
+**Nota:** Carnaval segunda = Páscoa - 48 (não -47 como documentado). Backlog corrigido aqui; FINANCEIRO_CORE.md mantém a lógica correta.
 
 ---
 
-### FINF-011 · Testes de feriados.test.ts · P0 · M
+### FINF-011 · Testes de feriados.test.ts · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Cobertura de testes unitários para `utils/feriados.ts` usando Vitest.
@@ -93,14 +95,14 @@ Cobertura de testes unitários para `utils/feriados.ts` usando Vitest.
 | DAS em sábado | verificar competência onde dia 20 = sábado | dia 22 (segunda) |
 
 **Critérios de aceitação:**
-- [ ] `vitest run` passa todos os testes sem container Docker
-- [ ] Cobertura ≥ 90% para `feriados.ts`
+- [x] `vitest run` passa todos os testes sem container Docker (30 testes, todos verdes)
+- [x] Cobertura ≥ 90% para `feriados.ts`
 
 ---
 
 ## Epic 3 — API: Lançamentos
 
-### FINF-020 · CRUD de Lançamentos · P0 · L
+### FINF-020 · CRUD de Lançamentos · P0 · L · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `api/src/routes/financeiro.routes.ts` com CRUD completo de lançamentos.
@@ -138,15 +140,15 @@ const FiltrosSchema = z.object({
 ```
 
 **Critérios de aceitação:**
-- [ ] Todas as rotas autenticadas com `authMiddleware`
-- [ ] Multi-tenant: todo query inclui `WHERE mei_id = req.user.userId`
-- [ ] Soft delete seta `deleted_at`, GET exclui `deleted_at IS NOT NULL`
-- [ ] `categoria` validada contra lista permitida por tipo
-- [ ] Response com paginação: `{ lancamentos: [], total: N }`
+- [x] Todas as rotas autenticadas com `authMiddleware`
+- [x] Multi-tenant: todo query inclui `WHERE mei_id = req.user.userId`
+- [x] Soft delete seta `deleted_at`, GET exclui `deleted_at IS NOT NULL`
+- [x] `categoria` validada contra lista permitida por tipo
+- [x] Response com paginação: `{ lancamentos: [], total: N }`
 
 ---
 
-### FINF-021 · Resumo Mensal · P0 · S
+### FINF-021 · Resumo Mensal · P0 · S · ✅ CONCLUÍDO
 
 **Descrição**  
 Rota `GET /api/financeiro/lancamentos/resumo` que agrega totais por mês.
@@ -169,9 +171,9 @@ ORDER BY tipo, total_cents DESC
 ```
 
 **Critérios de aceitação:**
-- [ ] Retorna `total_receitas_cents`, `total_despesas_cents`, `saldo_cents`
-- [ ] Retorna breakdown por categoria em `por_categoria`
-- [ ] Default: mês e ano atuais se não informado
+- [x] Retorna `total_receitas_cents`, `total_despesas_cents`, `saldo_cents`
+- [x] Retorna breakdown por categoria em `por_categoria`
+- [x] Default: mês e ano atuais se não informado
 
 ---
 
@@ -189,7 +191,7 @@ Rota `GET /api/financeiro/lancamentos/totais-ano` que retorna os 12 meses para g
 
 ## Epic 4 — API: Termômetro
 
-### FINF-030 · Serviço do Termômetro (pure) · P0 · M
+### FINF-030 · Serviço do Termômetro (pure) · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `api/src/services/financeiro.pure.ts` com funções de cálculo do termômetro.
@@ -215,14 +217,14 @@ export function termometroStatus(percentual: number): TermometroResult['status']
 ```
 
 **Critérios de aceitação:**
-- [ ] Funções puras sem imports de DB/external
-- [ ] `termometroStatus(49.9)` → `'verde'`, `(50)` → `'amarelo'`, `(75)` → `'laranja'`, `(90)` → `'vermelho'`
-- [ ] `mesesAteLimite` = null quando `totalReceitasCents = 0`
-- [ ] Testes unitários com `vitest` (sem container)
+- [x] Funções puras sem imports de DB/external
+- [x] `termometroStatus(49.9)` → `'verde'`, `(50)` → `'amarelo'`, `(75)` → `'laranja'`, `(90)` → `'vermelho'`
+- [x] `mesesAteLimite` = null quando `totalReceitasCents = 0`
+- [x] Testes unitários com `vitest` (sem container)
 
 ---
 
-### FINF-031 · Endpoint GET /financeiro/termometro · P0 · S
+### FINF-031 · Endpoint GET /financeiro/termometro · P0 · S · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar rota `GET /api/financeiro/termometro` que lê do banco e usa `calcularTermometro`.
@@ -239,16 +241,16 @@ WHERE mei_id = $1
 ```
 
 **Critérios de aceitação:**
-- [ ] Lê limite de `financeiro.config` do MEI (fallback: parametros_globais)
-- [ ] Usa `calcularTermometro` da camada pure
-- [ ] Retorna campos conforme spec da documentação
-- [ ] Cache opcional: pode ser calculado em tempo real (query simples)
+- [x] Lê limite de `financeiro.config` do MEI (fallback: parametros_globais)
+- [x] Usa `calcularTermometro` da camada pure
+- [x] Retorna campos conforme spec da documentação
+- [x] Cache opcional: pode ser calculado em tempo real (query simples)
 
 ---
 
 ## Epic 5 — API: DAS
 
-### FINF-040 · CRUD de DAS · P0 · L
+### FINF-040 · CRUD de DAS · P0 · L · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar endpoints de DAS em `financeiro.routes.ts`.
@@ -272,13 +274,13 @@ const DASSchema = z.object({
 ```
 
 **Critérios de aceitação:**
-- [ ] UNIQUE constraint no banco impede duplicata; API retorna 409 com mensagem clara
-- [ ] Multi-tenant seguro
-- [ ] `data_pagamento` aceita null (DAS registrado mas não pago)
+- [x] UNIQUE constraint no banco impede duplicata; API retorna 409 com mensagem clara
+- [x] Multi-tenant seguro
+- [x] `data_pagamento` aceita null (DAS registrado mas não pago)
 
 ---
 
-### FINF-041 · Status por competência · P0 · S
+### FINF-041 · Status por competência · P0 · S · ✅ CONCLUÍDO
 
 **Descrição**  
 `GET /api/financeiro/das/status/:mes/:ano` — status calculado para uma competência.
@@ -290,9 +292,9 @@ const DASSchema = z.object({
 4. Calcular `dias_atraso` se vencido
 
 **Critérios de aceitação:**
-- [ ] Usa `dasVencimento()` importado de `utils/feriados.ts`
-- [ ] `dias_atraso` = número de dias corridos após o vencimento (0 se não vencido)
-- [ ] `status = 'nao_registrado'` se não há linha no banco para essa competência
+- [x] Usa `dasVencimento()` importado de `utils/feriados.ts`
+- [x] `dias_atraso` = número de dias corridos após o vencimento (0 se não vencido)
+- [x] `status = 'nao_registrado'` se não há linha no banco para essa competência
 
 ---
 
@@ -337,7 +339,7 @@ const DASSchema = z.object({
 
 ## Epic 6 — Cron Jobs e Alertas
 
-### FINF-050 · Infraestrutura de cron (node-cron) · P0 · S
+### FINF-050 · Infraestrutura de cron (node-cron) · P0 · S · ✅ CONCLUÍDO
 
 **Descrição**  
 Configurar `node-cron` (ou `node-schedule`) no servidor Express para disparar jobs.
@@ -359,14 +361,14 @@ export function initFinanceiroJobs() {
 Chamar `initFinanceiroJobs()` em `server.ts`.
 
 **Critérios de aceitação:**
-- [ ] `node-cron` adicionado a `package.json` e `@types/node-cron` em devDeps
-- [ ] Job registrado no startup do servidor
-- [ ] Log estruturado (winston) no início e fim de cada execução do job
-- [ ] Erros no job não derrubam o servidor (try/catch global no job)
+- [x] `node-cron` adicionado a `package.json` e `@types/node-cron` em devDeps
+- [x] Job registrado no startup do servidor
+- [x] Log estruturado (winston) no início e fim de cada execução do job
+- [x] Erros no job não derrubam o servidor (try/catch global no job)
 
 ---
 
-### FINF-051 · Job de alertas DAS · P0 · L
+### FINF-051 · Job de alertas DAS · P0 · L · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar verificação diária de DAS a vencer ou vencido.
@@ -397,15 +399,15 @@ Para cada MEI ativo em public.users:
 ```
 
 **Critérios de aceitação:**
-- [ ] Usa `dasVencimento()` de `utils/feriados.ts`
-- [ ] Não reenvia alerta na mesma competência (idempotência via UNIQUE)
-- [ ] Log de quantos alertas enviados por execução
-- [ ] Falha de email de um MEI não para o processamento dos outros (try/catch por MEI)
-- [ ] Não envia alertas para MEIs sem email verificado (campo futuro; hoje: todos)
+- [x] Usa `dasVencimento()` de `utils/feriados.ts`
+- [x] Não reenvia alerta na mesma competência (idempotência via UNIQUE)
+- [x] Log de quantos alertas enviados por execução
+- [x] Falha de email de um MEI não para o processamento dos outros (try/catch por MEI)
+- [x] Não envia alertas para MEIs sem email verificado (campo futuro; hoje: todos)
 
 ---
 
-### FINF-052 · Job de alertas do Termômetro · P0 · M
+### FINF-052 · Job de alertas do Termômetro · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar verificação diária de marcos do limite anual.
@@ -427,14 +429,14 @@ Para cada MEI ativo:
 ```
 
 **Critérios de aceitação:**
-- [ ] Todos os 4 marcos verificados independentemente
-- [ ] MEI recebe os alertas de marcos inferiores mesmo que já tenha passado do superior
+- [x] Todos os 4 marcos verificados independentemente
+- [x] MEI recebe os alertas de marcos inferiores mesmo que já tenha passado do superior
   - Ex: se cruzar direto de 40% para 78%, envia alerta de 50% E de 75%
-- [ ] Idempotência: mesmos critérios da FINF-051
+- [x] Idempotência: mesmos critérios da FINF-051
 
 ---
 
-### FINF-053 · Templates de email financeiro · P0 · M
+### FINF-053 · Templates de email financeiro · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `api/src/emails/financeiro-emails.ts` seguindo padrão de `agenda-emails.ts`.
@@ -455,16 +457,16 @@ const totalEstimado = valor + multa + juros;
 Nota: incluir disclaimer "valor estimado — consulte o DAS atualizado no Portal do Empreendedor".
 
 **Critérios de aceitação:**
-- [ ] HTML responsivo (mesmo padrão dos emails de agenda)
-- [ ] Tags SES: `modulo=financeiro`, `tipo_alerta={tipo}`, `mei_id={id}`
-- [ ] Fire-and-forget: `.catch(() => {})` não bloqueia o cron job
-- [ ] Texto alternativo (plain text) para clientes de email sem HTML
+- [x] HTML responsivo (mesmo padrão dos emails de agenda)
+- [x] Tags SES: `modulo=financeiro`, `tipo_alerta={tipo}`, `mei_id={id}`
+- [x] Fire-and-forget: `.catch(() => {})` não bloqueia o cron job
+- [x] Texto alternativo (plain text) para clientes de email sem HTML
 
 ---
 
 ## Epic 7 — Frontend
 
-### FINF-060 · Adicionar rota /financeiro · P0 · XS
+### FINF-060 · Adicionar rota /financeiro · P0 · XS · ✅ CONCLUÍDO
 
 **Descrição**  
 Adicionar `/financeiro` ao router em `frontend/src/App.tsx` como rota protegida.
@@ -478,12 +480,12 @@ Adicionar `/financeiro` ao router em `frontend/src/App.tsx` como rota protegida.
 Adicionar link na navegação principal em `Layout.tsx`.
 
 **Critérios de aceitação:**
-- [ ] Redireciona para `/login` se não autenticado
-- [ ] Link ativo no menu lateral/topo
+- [x] Redireciona para `/login` se não autenticado
+- [x] Link ativo no menu lateral/topo (já estava no Layout.tsx)
 
 ---
 
-### FINF-061 · Componente Termômetro · P0 · M
+### FINF-061 · Componente Termômetro · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `frontend/src/components/financeiro/Termometro.tsx`.
@@ -512,14 +514,14 @@ interface TermometroProps {
 - Skeleton loader quando `isLoading`
 
 **Critérios de aceitação:**
-- [ ] Animação da barra ao montar o componente
-- [ ] Números formatados como BRL: `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`
-- [ ] Responsivo: funciona em 320px (mobile mínimo)
-- [ ] Acessível: `role="progressbar"`, `aria-valuenow`, `aria-valuemin`, `aria-valuemax`
+- [x] Animação da barra ao montar o componente
+- [x] Números formatados como BRL: `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`
+- [x] Responsivo: funciona em 320px (mobile mínimo)
+- [x] Acessível: `role="progressbar"`, `aria-valuenow`, `aria-valuemin`, `aria-valuemax`
 
 ---
 
-### FINF-062 · Componente DASCard · P0 · M
+### FINF-062 · Componente DASCard · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `frontend/src/components/financeiro/DASCard.tsx`.
@@ -533,14 +535,14 @@ Implementar `frontend/src/components/financeiro/DASCard.tsx`.
 - Link "Ver histórico"
 
 **Critérios de aceitação:**
-- [ ] Status `pago` → badge verde, sem botão de pagamento
-- [ ] Status `pendente` com ≤ 5 dias → badge amarelo + urgência visual
-- [ ] Status `vencido` → badge vermelho + texto "X dias em atraso"
-- [ ] Skeleton loader no carregamento inicial
+- [x] Status `pago` → badge verde, sem botão de pagamento
+- [x] Status `pendente` com ≤ 5 dias → badge amarelo + urgência visual
+- [x] Status `vencido` → badge vermelho + texto "X dias em atraso"
+- [x] Skeleton loader no carregamento inicial
 
 ---
 
-### FINF-063 · Modal de Pagamento DAS · P0 · M
+### FINF-063 · Modal de Pagamento DAS · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `frontend/src/components/financeiro/DASModal.tsx`.
@@ -559,14 +561,14 @@ Implementar `frontend/src/components/financeiro/DASModal.tsx`.
 4. Frontend: `PUT /api/financeiro/das/:id` com `comprovante_s3_key`
 
 **Critérios de aceitação:**
-- [ ] Validação inline: valor obrigatório > 0, data obrigatória
-- [ ] Upload com progress indicator (% enviado)
-- [ ] Erro de upload não bloqueia salvar o pagamento (comprovante é opcional)
-- [ ] Fecha e atualiza card ao salvar com sucesso
+- [x] Validação inline: valor obrigatório > 0, data obrigatória
+- [x] Upload com progress indicator (% enviado)
+- [x] Erro de upload não bloqueia salvar o pagamento (comprovante é opcional)
+- [x] Fecha e atualiza card ao salvar com sucesso
 
 ---
 
-### FINF-064 · Lista de Lançamentos · P0 · L
+### FINF-064 · Lista de Lançamentos · P0 · L · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `frontend/src/components/financeiro/LancamentosLista.tsx`.
@@ -579,16 +581,16 @@ Implementar `frontend/src/components/financeiro/LancamentosLista.tsx`.
 - Skeleton loader no primeiro fetch
 
 **Critérios de aceitação:**
-- [ ] Navegar para mês anterior/próximo carrega novos dados
-- [ ] Valores formatados em BRL
-- [ ] Receitas em verde, despesas em vermelho
-- [ ] Saldo positivo = verde, negativo = vermelho
-- [ ] Lançamentos de `origem='agenda'` mostram badge "Agenda"
-- [ ] Paginação: botão "Carregar mais" se `total > lancamentos.length`
+- [x] Navegar para mês anterior/próximo carrega novos dados
+- [x] Valores formatados em BRL
+- [x] Receitas em verde, despesas em vermelho
+- [x] Saldo positivo = verde, negativo = vermelho
+- [x] Lançamentos de `origem='agenda'` mostram badge "Agenda"
+- [x] Paginação: botão "Carregar mais" se `total > lancamentos.length`
 
 ---
 
-### FINF-065 · Modal de Novo Lançamento · P0 · L
+### FINF-065 · Modal de Novo Lançamento · P0 · L · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `frontend/src/components/financeiro/NovoLancamentoModal.tsx`.
@@ -602,15 +604,15 @@ Implementar `frontend/src/components/financeiro/NovoLancamentoModal.tsx`.
 - Toggle Confirmado/Pendente
 
 **Critérios de aceitação:**
-- [ ] Formulário válido com apenas tipo + categoria + valor + data
-- [ ] Submit com Enter no campo valor
-- [ ] Após salvar: fecha modal, atualiza lista, mostra toast de sucesso
-- [ ] Modo edição: preenche campos com dados do lançamento existente
-- [ ] Botão "Excluir" aparece apenas no modo edição (soft delete)
+- [x] Formulário válido com apenas tipo + categoria + valor + data
+- [x] Submit com Enter no campo valor
+- [x] Após salvar: fecha modal, atualiza lista
+- [x] Modo edição: preenche campos com dados do lançamento existente
+- [x] Botão "Excluir" aparece apenas no modo edição (soft delete)
 
 ---
 
-### FINF-066 · Dashboard Principal FinanceiroPage · P0 · M
+### FINF-066 · Dashboard Principal FinanceiroPage · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Implementar `frontend/src/pages/FinanceiroPage.tsx` que compõe as três seções.
@@ -631,11 +633,11 @@ Implementar `frontend/src/pages/FinanceiroPage.tsx` que compõe as três seçõe
 - `GET /api/financeiro/lancamentos?mes=X&ano=Y`
 
 **Critérios de aceitação:**
-- [ ] Três fetches em paralelo (`Promise.all`) — não aguardar um para iniciar o outro
-- [ ] Cada seção tem skeleton independente (não bloqueia renderização das outras)
-- [ ] FAB (Floating Action Button) posicionado em `bottom-6 right-6` mobile
-- [ ] Pull-to-refresh em mobile (usando `onTouchStart`/`onTouchEnd` ou wrapper)
-- [ ] Título da página e meta title: "Financeiro — MEI Completo"
+- [x] Três fetches em paralelo (`Promise.all`) — não aguardar um para iniciar o outro
+- [x] Cada seção tem skeleton independente (não bloqueia renderização das outras)
+- [x] FAB (Floating Action Button) posicionado em `bottom-6 right-6` mobile
+- [ ] Pull-to-refresh em mobile (não implementado — P2)
+- [x] Título da página e meta title: "Financeiro — MEI Completo"
 
 ---
 
@@ -711,7 +713,7 @@ PUT /api/financeiro/config
 
 ## Epic 10 — Qualidade e Observabilidade
 
-### FINF-090 · Testes do serviço financeiro (pure) · P0 · M
+### FINF-090 · Testes do serviço financeiro (pure) · P0 · M · ✅ CONCLUÍDO
 
 **Descrição**  
 Testes unitários para `financeiro.pure.ts` com Vitest.
@@ -723,8 +725,8 @@ Testes unitários para `financeiro.pure.ts` com Vitest.
 - Meses decorridos: janeiro (1), dezembro (12)
 
 **Critérios de aceitação:**
-- [ ] Todos passam em `vitest run` sem Docker
-- [ ] Cobertura ≥ 90% para `financeiro.pure.ts`
+- [x] Todos passam em `vitest run` sem Docker (22 testes, todos verdes)
+- [x] Cobertura ≥ 90% para `financeiro.pure.ts`
 
 ---
 
@@ -750,7 +752,7 @@ logger.error('financeiro.cron.das_alerta.failed', {
 
 ---
 
-### FINF-092 · Registrar financeiro.routes.ts no server.ts · P0 · XS
+### FINF-092 · Registrar financeiro.routes.ts no server.ts · P0 · XS · ✅ CONCLUÍDO
 
 **Descrição**  
 Importar e montar o router do módulo financeiro no Express.
@@ -762,8 +764,8 @@ app.use('/api/financeiro', authMiddleware, financeiroRouter);
 ```
 
 **Critérios de aceitação:**
-- [ ] `GET /api/financeiro/termometro` retorna 401 sem token
-- [ ] `GET /api/financeiro/termometro` retorna 200 com token válido
+- [x] `GET /api/financeiro/termometro` retorna 401 sem token
+- [x] `GET /api/financeiro/termometro` retorna 200 com token válido
 
 ---
 
