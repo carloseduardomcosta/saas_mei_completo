@@ -8,7 +8,10 @@ import { dbConnect } from "./db";
 import { healthRouter } from "./routes/health";
 import { authRouter } from "./routes/auth.routes";
 import { agendaRouter } from "./routes/agenda.routes";
+import { financeiroRouter } from "./routes/financeiro.routes";
+import { authMiddleware } from "./middleware/auth";
 import { publicRateLimiter } from "./middleware/rateLimiter";
+import { initFinanceiroJobs } from "./jobs/financeiro-cron";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
@@ -22,6 +25,7 @@ app.use(publicRateLimiter);
 app.use("/api", healthRouter);
 app.use("/api", authRouter);
 app.use("/api", agendaRouter);
+app.use("/api/financeiro", authMiddleware, financeiroRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error("Unhandled error", { error: err.message, stack: err.stack });
@@ -30,6 +34,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 async function start(): Promise<void> {
   await dbConnect();
+  initFinanceiroJobs();
   app.listen(PORT, "0.0.0.0", () => {
     logger.info(`API rodando em http://0.0.0.0:${PORT}`);
   });
