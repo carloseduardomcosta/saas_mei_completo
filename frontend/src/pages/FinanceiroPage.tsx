@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import { Termometro, type TermometroProps } from "../components/financeiro/Termometro";
+import { useAuth } from "../hooks/useAuth";
+import { Termometro as FinTermometro, type TermometroProps } from "../components/financeiro/Termometro";
 import { DASCard } from "../components/financeiro/DASCard";
 import { DASModal } from "../components/financeiro/DASModal";
 import { LancamentosLista } from "../components/financeiro/LancamentosLista";
 import { NovoLancamentoModal } from "../components/financeiro/NovoLancamentoModal";
+import { Sidebar } from "../components/ui/Sidebar";
+import { Topbar } from "../components/ui/Topbar";
+import { Toaster } from "react-hot-toast";
 
-// ── Tipos ────────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface TermometroData {
   ano: number;
@@ -38,9 +43,8 @@ function getMesAnoAtual(): { mes: number; ano: number } {
 }
 
 function getProximoMesCompetencia(): { mes: number; ano: number } {
-  // DAS referente ao mês anterior (competência = mês passado)
   const now = new Date();
-  let mes = now.getMonth(); // mês passado (0-indexed = mês atual - 1)
+  let mes = now.getMonth();
   let ano = now.getFullYear();
   if (mes === 0) { mes = 12; ano--; }
   return { mes, ano };
@@ -49,21 +53,19 @@ function getProximoMesCompetencia(): { mes: number; ano: number } {
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export default function FinanceiroPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { mes: mesAtual, ano: anoAtual } = getMesAnoAtual();
 
-  // Estado do Termômetro
   const [termometro, setTermometro] = useState<TermometroData | null>(null);
   const [termometroLoading, setTermometroLoading] = useState(true);
 
-  // Estado do DAS
   const [dasStatus, setDasStatus] = useState<DASStatusData | null>(null);
   const [dasLoading, setDasLoading] = useState(true);
 
-  // Navegação mês/ano dos lançamentos
   const [mesLanc, setMesLanc] = useState(mesAtual);
   const [anoLanc, setAnoLanc] = useState(anoAtual);
 
-  // Modais
   const [dasModal, setDasModal] = useState<DASStatusData | null>(null);
   const [lancModal, setLancModal] = useState<{
     open: boolean;
@@ -78,10 +80,8 @@ export default function FinanceiroPage() {
     } | null;
   }>({ open: false });
 
-  // Chave de refresh para lista
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Fetch inicial em paralelo
   useEffect(() => {
     const { mes: compMes, ano: compAno } = getProximoMesCompetencia();
 
@@ -95,7 +95,7 @@ export default function FinanceiroPage() {
       setTermometro(t);
       setDasStatus(d);
     }).catch(() => {
-      // Erros individuais não param o outro — cada seção tem fallback
+      // Errors handled individually — each section has a fallback
     }).finally(() => {
       setTermometroLoading(false);
       setDasLoading(false);
@@ -126,75 +126,86 @@ export default function FinanceiroPage() {
 
   return (
     <>
-      <title>Financeiro — MEI Completo</title>
+      <Toaster position="top-center" />
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar
+          activeRoute="/financeiro"
+          onNavigate={navigate}
+          userName={user?.name || user?.email || ""}
+        />
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4 pb-24">
-        <h1 className="text-xl font-bold text-gray-900">Financeiro</h1>
+        <main className="flex-1 md:ml-[52px] pb-16 md:pb-0">
+          <div className="p-4 max-w-2xl mx-auto space-y-4">
+            <Topbar userName={user?.name || user?.email || ""} />
 
-        {/* Pilar 1 — Termômetro */}
-        {termometroProps ? (
-          <Termometro {...termometroProps} isLoading={termometroLoading} />
-        ) : (
-          <Termometro
-            percentualUsado={0}
-            totalCents={0}
-            limiteCents={8_100_000}
-            valorRestanteCents={8_100_000}
-            mediaMensalCents={0}
-            mesesAteLimite={null}
-            status="verde"
-            isLoading={termometroLoading}
+            <h1 className="text-lg font-bold text-gray-900">Financeiro</h1>
+
+            {/* Termômetro */}
+            {termometroProps ? (
+              <FinTermometro {...termometroProps} isLoading={termometroLoading} />
+            ) : (
+              <FinTermometro
+                percentualUsado={0}
+                totalCents={0}
+                limiteCents={8_100_000}
+                valorRestanteCents={8_100_000}
+                mediaMensalCents={0}
+                mesesAteLimite={null}
+                status="verde"
+                isLoading={termometroLoading}
+              />
+            )}
+
+            {/* DAS */}
+            <DASCard
+              dasStatus={dasStatus}
+              isLoading={dasLoading}
+              onPagar={(das) => setDasModal(das)}
+              onVerHistorico={() => {
+                setMesLanc(dasStatus?.competencia_mes ?? mesAtual);
+                setAnoLanc(dasStatus?.competencia_ano ?? anoAtual);
+              }}
+            />
+
+            {/* Lançamentos */}
+            <LancamentosLista
+              mes={mesLanc}
+              ano={anoLanc}
+              onMesChange={(m, a) => { setMesLanc(m); setAnoLanc(a); }}
+              onEditLancamento={(l) => setLancModal({ open: true, lancamento: l })}
+              onNovoLancamento={() => setLancModal({ open: true })}
+              refreshKey={refreshKey}
+            />
+          </div>
+        </main>
+
+        {/* FAB */}
+        <button
+          onClick={() => setLancModal({ open: true })}
+          className="fixed bottom-20 md:bottom-6 right-6 w-14 h-14 bg-brand text-white rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-brand-dark active:scale-95 transition-all z-40"
+          aria-label="Novo lançamento"
+        >
+          +
+        </button>
+
+        {/* Modal DAS */}
+        {dasModal && (
+          <DASModal
+            das={dasModal}
+            onClose={() => setDasModal(null)}
+            onSaved={handleDasSaved}
           />
         )}
 
-        {/* Pilar 2 — DAS */}
-        <DASCard
-          dasStatus={dasStatus}
-          isLoading={dasLoading}
-          onPagar={(das) => setDasModal(das)}
-          onVerHistorico={() => {
-            setMesLanc(dasStatus?.competencia_mes ?? mesAtual);
-            setAnoLanc(dasStatus?.competencia_ano ?? anoAtual);
-          }}
-        />
-
-        {/* Pilar 3 — Lançamentos */}
-        <LancamentosLista
-          mes={mesLanc}
-          ano={anoLanc}
-          onMesChange={(m, a) => { setMesLanc(m); setAnoLanc(a); }}
-          onEditLancamento={(l) => setLancModal({ open: true, lancamento: l })}
-          onNovoLancamento={() => setLancModal({ open: true })}
-          refreshKey={refreshKey}
-        />
+        {/* Modal Lançamento */}
+        {lancModal.open && (
+          <NovoLancamentoModal
+            lancamento={lancModal.lancamento}
+            onClose={() => setLancModal({ open: false })}
+            onSaved={handleLancSaved}
+          />
+        )}
       </div>
-
-      {/* FAB — Floating Action Button */}
-      <button
-        onClick={() => setLancModal({ open: true })}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl hover:bg-blue-700 active:scale-95 transition-all z-40"
-        aria-label="Novo lançamento"
-      >
-        +
-      </button>
-
-      {/* Modal DAS */}
-      {dasModal && (
-        <DASModal
-          das={dasModal}
-          onClose={() => setDasModal(null)}
-          onSaved={handleDasSaved}
-        />
-      )}
-
-      {/* Modal Lançamento */}
-      {lancModal.open && (
-        <NovoLancamentoModal
-          lancamento={lancModal.lancamento}
-          onClose={() => setLancModal({ open: false })}
-          onSaved={handleLancSaved}
-        />
-      )}
     </>
   );
 }

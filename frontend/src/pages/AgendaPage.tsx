@@ -1,11 +1,19 @@
 // Painel da Agenda — área logada do MEI
-// Tabs: Hoje | Serviços | Disponibilidade | Configurações
+// Tabs: Hoje | Serviços | Horários | Config
 
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { CalendarX, CheckCircle, XCircle, DollarSign } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
+import { Sidebar } from "../components/ui/Sidebar";
+import { Topbar } from "../components/ui/Topbar";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import toast, { Toaster } from "react-hot-toast";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
-// ── Tipos ──────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface Booking {
   id: string;
@@ -54,13 +62,17 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelado",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  confirmed: "bg-blue-100 text-blue-700",
-  completed: "bg-green-100 text-green-700",
-  cancelled: "bg-gray-100 text-gray-500",
+const STATUS_BADGE: Record<string, "amber" | "green" | "gray"> = {
+  confirmed: "amber",
+  completed: "green",
+  cancelled: "gray",
 };
 
 const DAY_NAMES_FULL = [
+  "Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb",
+];
+
+const DAY_NAMES_LONG = [
   "Domingo","Segunda-feira","Terça-feira","Quarta-feira",
   "Quinta-feira","Sexta-feira","Sábado",
 ];
@@ -121,16 +133,14 @@ function useFetch<T>(url: string) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function TodayTab() {
-  const [date, setDate] = useState(todaySP());
+  const [date] = useState(todaySP());
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  }
+  const dateLabel = new Date(`${date}T12:00:00-03:00`).toLocaleDateString("pt-BR", {
+    weekday: "long", day: "numeric", month: "long",
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,10 +156,7 @@ function TodayTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function updateStatus(
-    id: string,
-    status: "confirmed" | "cancelled" | "completed"
-  ) {
+  async function updateStatus(id: string, status: "confirmed" | "cancelled" | "completed") {
     setActionLoading(id);
     try {
       await fetch(`${API_BASE}/api/agenda/bookings/${id}/status`, {
@@ -158,7 +165,9 @@ function TodayTab() {
         body: JSON.stringify({ status }),
       });
       await load();
-      showToast(`Status atualizado para "${STATUS_LABEL[status]}"`);
+      toast.success(`Status atualizado para "${STATUS_LABEL[status]}"`);
+    } catch {
+      toast.error("Erro ao atualizar status");
     } finally {
       setActionLoading(null);
     }
@@ -172,127 +181,89 @@ function TodayTab() {
         { method: "POST", headers: authHeader() }
       );
       const d = await r.json();
-      if (!r.ok) { showToast(d.error); return; }
-      showToast(d.message ?? "Lançado no financeiro!");
+      if (!r.ok) { toast.error(d.error ?? "Erro"); return; }
+      toast.success(d.message ?? "Lançado no financeiro!");
       await load();
+    } catch {
+      toast.error("Erro ao lançar no financeiro");
     } finally {
       setActionLoading(null);
     }
   }
 
-  const dateLabel = new Date(`${date}T12:00:00-03:00`).toLocaleDateString("pt-BR", {
-    weekday: "long", day: "numeric", month: "long",
-  });
-
   return (
     <div>
-      {/* Seletor de data */}
-      <div className="flex items-center gap-3 mb-6">
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <span className="text-sm text-gray-500 capitalize">{dateLabel}</span>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-medium text-gray-700 capitalize">{dateLabel}</p>
+        <Button variant="ghost" size="sm">Bloquear horário</Button>
       </div>
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-sm
-                        px-4 py-2 rounded-lg shadow-lg">
-          {toast}
-        </div>
-      )}
-
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />
+          ))}
         </div>
       ) : bookings.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-4xl mb-2">📅</p>
-          <p className="text-sm">Nenhum agendamento neste dia</p>
+        <div className="text-center py-12">
+          <CalendarX size={40} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-gray-500 text-sm">Nenhum agendamento hoje</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {bookings.map((b) => (
             <div
               key={b.id}
-              className={`border rounded-xl p-4 ${
-                b.status === "cancelled" ? "opacity-60 bg-gray-50" : "bg-white"
-              }`}>
-              {/* Linha 1: horário + status */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-gray-900">
-                    {formatTimeSP(b.starts_at)}
-                  </span>
-                  <span className="text-sm text-gray-400">→ {formatTimeSP(b.ends_at)}</span>
-                </div>
-                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${STATUS_COLOR[b.status]}`}>
-                  {STATUS_LABEL[b.status]}
-                </span>
+              className={`flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 mb-2 ${
+                b.status === "cancelled" ? "opacity-60" : ""
+              }`}
+            >
+              <span className="text-sm font-bold text-gray-700 w-12 flex-shrink-0">
+                {formatTimeSP(b.starts_at)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{b.client_name}</p>
+                <p className="text-xs text-gray-500">{b.service_name} · {b.duration_minutes}min</p>
+                {b.price_cents > 0 && (
+                  <p className="text-xs text-gray-600 font-medium">{formatBRL(b.price_cents)}</p>
+                )}
               </div>
-
-              {/* Linha 2: cliente + serviço */}
-              <p className="font-semibold text-gray-900">{b.client_name}</p>
-              <p className="text-sm text-gray-500">{b.service_name} · {b.duration_minutes}min</p>
-              {b.client_phone && (
-                <p className="text-sm text-gray-400 mt-0.5">📱 {b.client_phone}</p>
-              )}
-              {b.notes && (
-                <p className="text-sm text-gray-500 mt-1 italic">"{b.notes}"</p>
-              )}
-
-              {/* Preço */}
-              {b.price_cents > 0 && (
-                <p className="text-sm font-semibold text-gray-700 mt-2">
-                  {formatBRL(b.price_cents)}
-                </p>
-              )}
-
-              {/* Ações */}
-              {b.status !== "cancelled" && (
-                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
-                  {b.status === "confirmed" && (
-                    <>
-                      <button
-                        disabled={actionLoading === b.id}
-                        onClick={() => updateStatus(b.id, "completed")}
-                        className="text-xs bg-green-600 hover:bg-green-700 text-white
-                                   px-3 py-1.5 rounded-lg font-medium transition-colors
-                                   disabled:opacity-50">
-                        ✓ Concluir
-                      </button>
-                      <button
-                        disabled={actionLoading === b.id}
-                        onClick={() => updateStatus(b.id, "cancelled")}
-                        className="text-xs bg-red-50 hover:bg-red-100 text-red-600
-                                   px-3 py-1.5 rounded-lg font-medium transition-colors
-                                   disabled:opacity-50">
-                        Cancelar
-                      </button>
-                    </>
-                  )}
-                  {b.status === "completed" && !b.financial_launch_id && b.price_cents > 0 && (
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant={STATUS_BADGE[b.status]}>{STATUS_LABEL[b.status]}</Badge>
+                {b.status === "confirmed" && (
+                  <div className="flex gap-1 mt-1">
                     <button
                       disabled={actionLoading === b.id}
-                      onClick={() => launchFinancial(b)}
-                      className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700
-                                 px-3 py-1.5 rounded-lg font-medium transition-colors
-                                 disabled:opacity-50">
-                      💰 Lançar no financeiro
+                      onClick={() => updateStatus(b.id, "completed")}
+                      aria-label="Concluir agendamento"
+                      className="p-1 rounded-lg bg-success-light hover:bg-success/20 transition-colors disabled:opacity-50"
+                    >
+                      <CheckCircle size={14} className="text-success" />
                     </button>
-                  )}
-                  {b.status === "completed" && b.financial_launch_id && (
-                    <span className="text-xs text-green-600 font-medium">
-                      ✓ Lançado no financeiro
-                    </span>
-                  )}
-                </div>
-              )}
+                    <button
+                      disabled={actionLoading === b.id}
+                      onClick={() => updateStatus(b.id, "cancelled")}
+                      aria-label="Cancelar agendamento"
+                      className="p-1 rounded-lg bg-danger-light hover:bg-danger/20 transition-colors disabled:opacity-50"
+                    >
+                      <XCircle size={14} className="text-danger" />
+                    </button>
+                  </div>
+                )}
+                {b.status === "completed" && !b.financial_launch_id && b.price_cents > 0 && (
+                  <button
+                    disabled={actionLoading === b.id}
+                    onClick={() => launchFinancial(b)}
+                    aria-label="Lançar no financeiro"
+                    className="p-1 rounded-lg bg-brand-light hover:bg-brand/20 transition-colors disabled:opacity-50"
+                  >
+                    <DollarSign size={14} className="text-brand" />
+                  </button>
+                )}
+                {b.status === "completed" && b.financial_launch_id && (
+                  <span className="text-[10px] text-success font-medium">Lançado</span>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -338,113 +309,107 @@ function ServicesTab() {
       if (!r.ok) { setError(d.error ?? "Erro"); return; }
       setEditing(null);
       reload();
+      toast.success(isNew ? "Serviço criado!" : "Serviço atualizado!");
+    } catch {
+      toast.error("Erro ao salvar serviço");
     } finally {
       setSaving(false);
     }
   }
 
   async function deactivate(id: string) {
-    if (!confirm("Desativar este serviço? Ele não aparecerá mais na página de agendamento.")) return;
-    await fetch(`${API_BASE}/api/agenda/services/${id}`, {
-      method: "DELETE",
-      headers: authHeader(),
-    });
-    reload();
+    if (!confirm("Desativar este serviço?")) return;
+    try {
+      await fetch(`${API_BASE}/api/agenda/services/${id}`, {
+        method: "DELETE",
+        headers: authHeader(),
+      });
+      reload();
+      toast.success("Serviço removido");
+    } catch {
+      toast.error("Erro ao remover serviço");
+    }
   }
 
-  if (loading) return <div className="py-12 text-center text-gray-400">Carregando...</div>;
+  if (loading) return (
+    <div className="space-y-2">
+      {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>
+  );
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="font-semibold text-gray-900">Serviços ({data?.filter(s => s.active).length ?? 0} ativos)</h3>
-        <button
-          onClick={() => setEditing(EMPTY_SERVICE)}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium
-                     px-4 py-2 rounded-lg transition-colors">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium text-gray-700">
+          Serviços ({data?.filter((s) => s.active).length ?? 0} ativos)
+        </h3>
+        <Button variant="primary" size="sm" onClick={() => setEditing(EMPTY_SERVICE)}>
           + Novo serviço
-        </button>
+        </Button>
       </div>
 
       {/* Modal de edição */}
       {editing !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">
               {editing.id ? "Editar serviço" : "Novo serviço"}
             </h3>
-
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                <label htmlFor="svc-name" className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                 <input
+                  id="svc-name"
                   type="text"
                   value={editing.name ?? ""}
                   onChange={(e) => setEditing((d) => ({ ...d, name: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                   placeholder="Ex: Corte feminino"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                <label htmlFor="svc-desc" className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                 <textarea
+                  id="svc-desc"
                   rows={2}
                   value={editing.description ?? ""}
                   onChange={(e) => setEditing((d) => ({ ...d, description: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Duração (min) *</label>
+                  <label htmlFor="svc-dur" className="block text-sm font-medium text-gray-700 mb-1">Duração (min) *</label>
                   <input
+                    id="svc-dur"
                     type="number"
-                    min={5}
-                    max={480}
-                    step={5}
+                    min={5} max={480} step={5}
                     value={editing.duration_minutes ?? 60}
                     onChange={(e) => setEditing((d) => ({ ...d, duration_minutes: +e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>
+                  <label htmlFor="svc-price" className="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>
                   <input
+                    id="svc-price"
                     type="number"
-                    min={0}
-                    step={0.01}
+                    min={0} step={0.01}
                     value={((editing.price_cents ?? 0) / 100).toFixed(2)}
-                    onChange={(e) =>
-                      setEditing((d) => ({ ...d, price_cents: Math.round(+e.target.value * 100) }))
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => setEditing((d) => ({ ...d, price_cents: Math.round(+e.target.value * 100) }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                   />
                 </div>
               </div>
             </div>
-
-            {error && (
-              <p className="text-sm text-red-600 mt-3 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
-            )}
-
+            {error && <p className="text-sm text-danger mt-3 bg-danger-light px-3 py-2 rounded-lg">{error}</p>}
             <div className="flex gap-3 mt-5">
-              <button
-                onClick={() => setEditing(null)}
-                className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg
-                           text-sm font-medium hover:bg-gray-50">
+              <Button variant="ghost" size="md" className="flex-1" onClick={() => setEditing(null)}>
                 Cancelar
-              </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg
-                           text-sm font-medium disabled:opacity-50">
+              </Button>
+              <Button variant="primary" size="md" className="flex-1" onClick={save} disabled={saving}>
                 {saving ? "Salvando..." : "Salvar"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -452,29 +417,35 @@ function ServicesTab() {
 
       {/* Lista de serviços */}
       <div className="space-y-2">
+        {data?.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-8">Nenhum serviço cadastrado ainda</p>
+        )}
         {data?.map((s) => (
           <div
             key={s.id}
-            className={`border rounded-xl p-4 flex items-center justify-between gap-3
-              ${!s.active ? "opacity-40 bg-gray-50" : "bg-white"}`}>
-            <div>
-              <p className="font-medium text-gray-900">{s.name}</p>
-              <p className="text-sm text-gray-500">
+            className={`border rounded-xl p-3 flex items-center justify-between gap-3 ${
+              !s.active ? "opacity-40 bg-gray-50 border-gray-100" : "bg-white border-gray-100"
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-gray-900 truncate">{s.name}</p>
+              <p className="text-xs text-gray-500">
                 {s.duration_minutes}min
                 {s.price_cents > 0 ? ` · ${formatBRL(s.price_cents)}` : " · Gratuito"}
               </p>
-              {s.description && <p className="text-xs text-gray-400 mt-0.5">{s.description}</p>}
             </div>
             {s.active && (
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => setEditing(s)}
-                  className="text-xs text-blue-600 hover:underline px-2 py-1">
+                  className="text-xs text-brand hover:underline px-2 py-1"
+                >
                   Editar
                 </button>
                 <button
                   onClick={() => deactivate(s.id)}
-                  className="text-xs text-red-500 hover:underline px-2 py-1">
+                  className="text-xs text-danger hover:underline px-2 py-1"
+                >
                   Remover
                 </button>
               </div>
@@ -494,7 +465,6 @@ function AvailabilityTab() {
   const [avail, setAvail] = useState<AvailRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/agenda/availability`, { headers: authHeader() })
@@ -505,7 +475,6 @@ function AvailabilityTab() {
       });
   }, []);
 
-  // Matriz de trabalho: indexed por day_of_week
   const matrix = Array.from({ length: 7 }, (_, i) => {
     const row = avail.find((a) => a.day_of_week === i);
     return { day_of_week: i, active: !!row, start_time: row?.start_time ?? "09:00", end_time: row?.end_time ?? "18:00" };
@@ -527,89 +496,75 @@ function AvailabilityTab() {
 
   async function save() {
     setSaving(true);
-    await fetch(`${API_BASE}/api/agenda/availability`, {
-      method: "PUT",
-      headers: authHeader(),
-      body: JSON.stringify(avail),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    try {
+      await fetch(`${API_BASE}/api/agenda/availability`, {
+        method: "PUT",
+        headers: authHeader(),
+        body: JSON.stringify(avail),
+      });
+      toast.success("Disponibilidade salva!");
+    } catch {
+      toast.error("Erro ao salvar disponibilidade");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  if (loading) return <div className="py-12 text-center text-gray-400">Carregando...</div>;
+  if (loading) return (
+    <div className="space-y-2">
+      {[1,2,3,4,5].map((i) => <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>
+  );
 
   return (
     <div>
-      <p className="text-sm text-gray-500 mb-5">
+      <p className="text-xs text-gray-500 mb-4">
         Configure os dias e horários em que você atende.
-        Dias sem ativação não aparecerão para agendamento.
       </p>
-
-      <div className="space-y-2 mb-6">
+      <div className="space-y-1 mb-5">
         {matrix.map((row) => (
-          <div
-            key={row.day_of_week}
-            className={`border rounded-xl p-3 transition-all ${
-              row.active ? "bg-white border-gray-200" : "bg-gray-50 border-gray-100"
-            }`}>
-            <div className="flex items-center gap-3">
-              {/* Toggle */}
-              <button
-                onClick={() => toggle(row.day_of_week)}
-                className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
-                  row.active ? "bg-blue-600" : "bg-gray-300"
-                }`}>
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full
-                  transition-transform ${row.active ? "translate-x-5" : ""}`} />
-              </button>
-
-              <span className={`text-sm font-medium w-32 shrink-0 ${
-                row.active ? "text-gray-900" : "text-gray-400"
-              }`}>
-                {DAY_NAMES_FULL[row.day_of_week]}
-              </span>
-
-              {row.active && (
-                <div className="flex items-center gap-2 flex-1">
-                  <input
-                    type="time"
-                    value={row.start_time}
-                    onChange={(e) => update(row.day_of_week, "start_time", e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-400 text-sm">até</span>
-                  <input
-                    type="time"
-                    value={row.end_time}
-                    onChange={(e) => update(row.day_of_week, "end_time", e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              )}
-            </div>
+          <div key={row.day_of_week} className="flex items-center gap-3 py-2 border-b border-gray-50">
+            <span className="text-sm text-gray-700 w-8 flex-shrink-0">
+              {DAY_NAMES_FULL[row.day_of_week]}
+            </span>
+            <input
+              type="checkbox"
+              checked={row.active}
+              onChange={() => toggle(row.day_of_week)}
+              aria-label={`Ativar ${DAY_NAMES_LONG[row.day_of_week]}`}
+              className="accent-brand"
+            />
+            {row.active && (
+              <>
+                <input
+                  type="time"
+                  value={row.start_time}
+                  onChange={(e) => update(row.day_of_week, "start_time", e.target.value)}
+                  aria-label={`Horário de início — ${DAY_NAMES_LONG[row.day_of_week]}`}
+                  className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+                <span className="text-gray-400 text-xs">às</span>
+                <input
+                  type="time"
+                  value={row.end_time}
+                  onChange={(e) => update(row.day_of_week, "end_time", e.target.value)}
+                  aria-label={`Horário de fim — ${DAY_NAMES_LONG[row.day_of_week]}`}
+                  className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </>
+            )}
           </div>
         ))}
       </div>
-
-      <button
-        onClick={save}
-        disabled={saving}
-        className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors
-          ${saved
-            ? "bg-green-600 text-white"
-            : "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-          }`}>
-        {saving ? "Salvando..." : saved ? "✓ Disponibilidade salva!" : "Salvar disponibilidade"}
-      </button>
+      <Button variant="primary" size="lg" onClick={save} disabled={saving}>
+        {saving ? "Salvando..." : "Salvar disponibilidade"}
+      </Button>
     </div>
   );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Tab: Configurações (perfil da página pública)
+// Tab: Configurações
 // ══════════════════════════════════════════════════════════════════════════════
 
 function ConfigTab() {
@@ -622,8 +577,6 @@ function ConfigTab() {
   });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/agenda/profile`, { headers: authHeader() })
@@ -637,7 +590,6 @@ function ConfigTab() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
     try {
       const r = await fetch(`${API_BASE}/api/agenda/profile`, {
         method: "PUT",
@@ -645,45 +597,51 @@ function ConfigTab() {
         body: JSON.stringify(profile),
       });
       const d = await r.json();
-      if (!r.ok) { setError(d.error ?? "Erro"); return; }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      if (!r.ok) { toast.error(d.error ?? "Erro ao salvar"); return; }
+      toast.success("Configurações salvas!");
+    } catch {
+      toast.error("Erro ao salvar configurações");
     } finally {
       setSaving(false);
     }
   }
 
-  if (!loaded) return <div className="py-12 text-center text-gray-400">Carregando...</div>;
+  function copiarLink() {
+    const appUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+    const url = `${appUrl}/agendar/${profile.slug}`;
+    navigator.clipboard.writeText(url).then(() => toast.success("Link copiado!"));
+  }
 
-  const appUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
-  const publicUrl = profile.slug ? `${appUrl}/agendar/${profile.slug}` : null;
+  if (!loaded) return (
+    <div className="space-y-2">
+      {[1,2,3].map((i) => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>
+  );
 
   return (
     <form onSubmit={save} className="space-y-4">
-      {publicUrl && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <p className="text-xs text-blue-600 font-medium mb-1">Seu link de agendamento</p>
-          <a
-            href={publicUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-blue-700 font-semibold hover:underline break-all">
-            {publicUrl}
-          </a>
+      {/* Link preview */}
+      {profile.slug && (
+        <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+          <span className="text-sm text-gray-600 truncate">
+            {(import.meta.env.VITE_APP_URL ?? window.location.origin)}/agendar/{profile.slug}
+          </span>
+          <Button size="sm" variant="ghost" type="button" onClick={copiarLink}>
+            Copiar
+          </Button>
         </div>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="cfg-slug" className="block text-sm font-medium text-gray-700 mb-1">
           Link personalizado *
-          <span className="text-xs text-gray-400 font-normal ml-1">(meuapp.com/agendar/LINK)</span>
         </label>
-        <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden
-                        focus-within:ring-2 focus-within:ring-blue-500">
-          <span className="bg-gray-50 px-3 py-2.5 text-sm text-gray-400 border-r border-gray-300 shrink-0">
+        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-brand">
+          <span className="bg-gray-50 px-3 py-2.5 text-sm text-gray-400 border-r border-gray-200 shrink-0">
             /agendar/
           </span>
           <input
+            id="cfg-slug"
             type="text"
             required
             value={profile.slug}
@@ -697,79 +655,66 @@ function ConfigTab() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nome do negócio *</label>
+        <label htmlFor="cfg-name" className="block text-sm font-medium text-gray-700 mb-1">
+          Nome do negócio *
+        </label>
         <input
+          id="cfg-name"
           type="text"
           required
           value={profile.business_name}
           onChange={(e) => setProfile((p) => ({ ...p, business_name: e.target.value }))}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
           placeholder="Studio da Ana"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+        <label htmlFor="cfg-desc" className="block text-sm font-medium text-gray-700 mb-1">
+          Descrição
+        </label>
         <textarea
+          id="cfg-desc"
           rows={3}
           value={profile.description ?? ""}
           onChange={(e) => setProfile((p) => ({ ...p, description: e.target.value }))}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          placeholder="Especialista em cabelos, atendimento no centro de Timbó/SC"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
+          placeholder="Especialista em cabelos, atendimento no centro..."
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Agendamento até
-            <span className="text-xs text-gray-400 font-normal ml-1">(dias)</span>
+          <label htmlFor="cfg-adv" className="block text-sm font-medium text-gray-700 mb-1">
+            Agend. até (dias)
           </label>
           <input
+            id="cfg-adv"
             type="number"
-            min={1}
-            max={90}
+            min={1} max={90}
             value={profile.booking_advance_days}
             onChange={(e) => setProfile((p) => ({ ...p, booking_advance_days: +e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Antecedência mínima
-            <span className="text-xs text-gray-400 font-normal ml-1">(horas)</span>
+          <label htmlFor="cfg-min" className="block text-sm font-medium text-gray-700 mb-1">
+            Antecedência (h)
           </label>
           <input
+            id="cfg-min"
             type="number"
-            min={0}
-            max={72}
+            min={0} max={72}
             value={profile.min_advance_hours}
             onChange={(e) => setProfile((p) => ({ ...p, min_advance_hours: +e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
           />
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={saving}
-        className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors
-          ${saved
-            ? "bg-green-600 text-white"
-            : "bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-          }`}>
-        {saving ? "Salvando..." : saved ? "✓ Configurações salvas!" : "Salvar configurações"}
-      </button>
+      <Button type="submit" variant="primary" size="lg" disabled={saving}>
+        {saving ? "Salvando..." : "Salvar configurações"}
+      </Button>
     </form>
   );
 }
@@ -779,46 +724,58 @@ function ConfigTab() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function AgendaPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("today");
 
-  const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: "today", label: "Agenda", icon: "📅" },
-    { id: "services", label: "Serviços", icon: "✂️" },
-    { id: "availability", label: "Horários", icon: "🕐" },
-    { id: "config", label: "Config", icon: "⚙️" },
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "today",        label: "Agenda do Dia" },
+    { id: "services",     label: "Serviços" },
+    { id: "availability", label: "Horários" },
+    { id: "config",       label: "Config" },
   ];
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
-      </div>
+    <>
+      <Toaster position="top-center" />
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar
+          activeRoute="/agenda"
+          onNavigate={navigate}
+          userName={user?.name || user?.email || ""}
+        />
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2
-                        rounded-lg text-sm font-medium transition-all
-              ${tab === t.id
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-              }`}>
-            <span className="text-base">{t.icon}</span>
-            <span className="hidden sm:inline">{t.label}</span>
-          </button>
-        ))}
-      </div>
+        <main className="flex-1 md:ml-[52px] pb-16 md:pb-0">
+          <div className="p-4 max-w-2xl mx-auto">
+            <Topbar userName={user?.name || user?.email || ""} />
 
-      {/* Conteúdo */}
-      <div>
-        {tab === "today" && <TodayTab />}
-        {tab === "services" && <ServicesTab />}
-        {tab === "availability" && <AvailabilityTab />}
-        {tab === "config" && <ConfigTab />}
+            {/* Tab bar */}
+            <div className="flex border-b border-gray-200 mt-4 overflow-x-auto">
+              {tabs.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`px-4 py-2 text-sm whitespace-nowrap transition-colors ${
+                    tab === t.id
+                      ? "border-b-2 border-brand text-brand font-medium"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content */}
+            <div className="mt-4">
+              {tab === "today"        && <TodayTab />}
+              {tab === "services"     && <ServicesTab />}
+              {tab === "availability" && <AvailabilityTab />}
+              {tab === "config"       && <ConfigTab />}
+            </div>
+          </div>
+        </main>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --brand: #FF6B35;
+  --brand-light: #FFF0EB;
+  --brand-dark: #C24A1A;
+  --sidebar-bg: #1A1A2E;
+  --sidebar-text: #A8A8C0;
+  --success: #1B9E5A;
+  --success-light: #E6F7EE;
+  --warning: #E8A020;
+  --warning-light: #FEF3D7;
+  --danger: #E24B4A;
+  --danger-light: #FCEBEB;
+}
+
+* {
+  font-family: Inter, system-ui, sans-serif;
+}
