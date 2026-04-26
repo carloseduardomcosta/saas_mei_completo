@@ -39,14 +39,36 @@ authRouter.post("/auth/register", authRateLimiter, async (req: Request, res: Res
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const { rows } = await db.query<{ id: string; email: string; name: string }>(
-    `INSERT INTO public.users (name, email, password_hash, cpf_cnpj)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, email, name`,
-    [name, email, passwordHash, cpf_cnpj ?? null]
-  );
 
-  const user = rows[0];
+  // Transação: cria usuário + config financeira padrão atomicamente
+  const client = await db.connect();
+  let user: { id: string; email: string; name: string };
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query<{ id: string; email: string; name: string }>(
+      `INSERT INTO public.users (name, email, password_hash, cpf_cnpj)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, email, name`,
+      [name, email, passwordHash, cpf_cnpj ?? null]
+    );
+    user = rows[0];
+
+    // Cria config financeira com defaults: limite R$ 81.000, tipo 'comercio'
+    await client.query(
+      `INSERT INTO financeiro.config (mei_id, limite_anual_cents, tipo_atividade)
+       VALUES ($1, 8100000, 'comercio')`,
+      [user.id]
+    );
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
   const token = jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
   });
